@@ -39,4 +39,4 @@ def realtime_visualize_pcds(folder_path):
 
 
 if __name__ == "__main__":
-    realtime_visualize_pcds("pcd_folder")
+    realtime_visualize_pcds("rs_pcd_folder")
