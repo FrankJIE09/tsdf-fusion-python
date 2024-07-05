@@ -5,10 +5,11 @@ from tqdm import tqdm
 
 
 def realtime_visualize_pcds(folder_path):
+
     pcd_files = sorted([file for file in os.listdir(folder_path) if file.endswith('.pcd')])
     vis = o3d.visualization.Visualizer()
     vis.create_window("Realtime PCD Viewer", width=800, height=600)
-
+    first = True
     # 用于跟踪当前显示的几何形状
     displayed_geometry = None
 
@@ -27,6 +28,12 @@ def realtime_visualize_pcds(folder_path):
         vis.add_geometry(pcd)
         vis.reset_view_point(True)
         displayed_geometry = pcd
+        # 设置视角
+        ctr = vis.get_view_control()
+        ctr.set_front([0, 0, -1])  # 设置前视角
+        ctr.set_lookat([0, 0, 0])  # 设置观察目标点
+        ctr.set_up([0, -1, 0])     # 设置上方向
+        ctr.set_zoom(0.8)          # 设置缩放比例
 
         vis.poll_events()
         vis.update_renderer()

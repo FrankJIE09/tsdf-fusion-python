@@ -56,14 +56,15 @@ if __name__ == "__main__":
 
         # 提取并保存每一帧的点云
         # 从TSDF体积提取点云并转换为Open3D点云格式
-        point_cloud = tsdf_vol.get_point_cloud()
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(point_cloud[:, :3])  # 更新点云坐标
-        if point_cloud.shape[1] > 3:
-            pcd.colors = o3d.utility.Vector3dVector(point_cloud[:, 3:] / 255.0)  # 更新点云颜色（如果有）
-        # 保存当前帧的点云到PCD文件
-        pcd_filename = os.path.join(pcd_folder, f"frame-{i:06d}.pcd")
-        o3d.io.write_point_cloud(pcd_filename, pcd)
+        if i % 10==0:
+            point_cloud = tsdf_vol.get_point_cloud()
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(point_cloud[:, :3])  # 更新点云坐标
+            if point_cloud.shape[1] > 3:
+                pcd.colors = o3d.utility.Vector3dVector(point_cloud[:, 3:] / 255.0)  # 更新点云颜色（如果有）
+            # 保存当前帧的点云到PCD文件
+            pcd_filename = os.path.join(pcd_folder, f"frame-{i:06d}.pcd")
+            o3d.io.write_point_cloud(pcd_filename, pcd)
 
     fps = n_imgs / (time.time() - t0_elapse)  # 计算平均帧率
     print("Average FPS: {:.2f}".format(fps))  # 打印平均帧率

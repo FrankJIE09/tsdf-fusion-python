@@ -14,6 +14,7 @@ def load_intrinsics(file_path):
         intrinsics = json.load(file)
         return np.array(intrinsics)
 
+
 def clear_folder(folder_path):
     """清空指定文件夹中的所有内容。"""
     for item in os.listdir(folder_path):
@@ -22,6 +23,7 @@ def clear_folder(folder_path):
             os.unlink(item_path)
         elif os.path.isdir(item_path):
             shutil.rmtree(item_path)
+
 
 def get_view_frustum(depth_im, cam_intr, cam_pose):
     """计算相机视锥体并返回其顶点"""
@@ -43,6 +45,7 @@ def get_view_frustum(depth_im, cam_intr, cam_pose):
     world_pts = world_pts_homog[:, :3] / world_pts_homog[:, 3:]
 
     return world_pts
+
 
 if __name__ == "__main__":
     print("Estimating voxel volume bounds...")  # 打印当前操作
@@ -94,19 +97,19 @@ if __name__ == "__main__":
         volume.integrate(rgbd_image, intrinsic, np.linalg.inv(cam_pose))
 
         cv2.imshow('Color Image', color_image)
-        depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_im, alpha=255/depth_im.max()), cv2.COLORMAP_JET)
+        depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_im, alpha=255 / depth_im.max()), cv2.COLORMAP_JET)
         cv2.imshow('Depth Image', depth_colormap)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-
-        point_cloud = volume.extract_point_cloud()
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(np.asarray(point_cloud.points))  # 更新点云坐标
-        if np.asarray(point_cloud.colors).shape[1] == 3:
-            pcd.colors = o3d.utility.Vector3dVector(np.asarray(point_cloud.colors))  # 更新点云颜色
-        pcd_filename = os.path.join(pcd_folder, f"frame-{i:06d}.pcd")
-        o3d.io.write_point_cloud(pcd_filename, pcd)
+        if i % 10 == 0:
+            point_cloud = volume.extract_point_cloud()
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(np.asarray(point_cloud.points))  # 更新点云坐标
+            if np.asarray(point_cloud.colors).shape[1] == 3:
+                pcd.colors = o3d.utility.Vector3dVector(np.asarray(point_cloud.colors))  # 更新点云颜色
+            pcd_filename = os.path.join(pcd_folder, f"frame-{i:06d}.pcd")
+            o3d.io.write_point_cloud(pcd_filename, pcd)
 
     fps = n_imgs / (time.time() - t0_elapse)  # 计算平均帧率
     print("Average FPS: {:.2f}".format(fps))  # 打印平均帧率
