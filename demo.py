@@ -6,7 +6,8 @@ import cv2
 import numpy as np
 import fusion
 from skimage import measure
-
+import os
+import open3d as o3d
 if __name__ == "__main__":
     # ======================================================================================================== #
     # 计算数据集中所有相机视锥的凸包在世界坐标系中的3D边界
@@ -35,7 +36,9 @@ if __name__ == "__main__":
     # 初始化体素体积
     print("Initializing voxel volume...")  # 打印当前操作
     tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.02)  # 创建TSDF体素体积对象，体素大小为2cm
-
+    # 确保PCD文件夹存在
+    pcd_folder = "pcd_folder"
+    os.makedirs(pcd_folder, exist_ok=True)
     # 遍历所有的RGB-D图像并将它们融合在一起
     t0_elapse = time.time()  # 记录起始时间
     for i in range(n_imgs):
@@ -50,6 +53,17 @@ if __name__ == "__main__":
 
         # 将观测结果融合到体素体积中（假设颜色与深度对齐）
         tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)  # 融合当前帧
+
+        # 提取并保存每一帧的点云
+        # 从TSDF体积提取点云并转换为Open3D点云格式
+        point_cloud = tsdf_vol.get_point_cloud()
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(point_cloud[:, :3])  # 更新点云坐标
+        if point_cloud.shape[1] > 3:
+            pcd.colors = o3d.utility.Vector3dVector(point_cloud[:, 3:] / 255.0)  # 更新点云颜色（如果有）
+        # 保存当前帧的点云到PCD文件
+        pcd_filename = os.path.join(pcd_folder, f"frame-{i:06d}.pcd")
+        o3d.io.write_point_cloud(pcd_filename, pcd)
 
     fps = n_imgs / (time.time() - t0_elapse)  # 计算平均帧率
     print("Average FPS: {:.2f}".format(fps))  # 打印平均帧率

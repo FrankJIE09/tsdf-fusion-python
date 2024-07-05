@@ -31,7 +31,9 @@ if __name__ == "__main__":
     # 初始化Open3D可视化窗口
     vis = o3d.visualization.Visualizer()
     vis.create_window()
-    pcd = o3d.geometry.PointCloud()
+    # pcd = o3d.geometry.PointCloud()
+    pcd = o3d.io.read_point_cloud("pc.ply")
+
     vis.add_geometry(pcd)
 
     # 遍历所有的RGB-D图像并将它们融合在一起
@@ -53,7 +55,7 @@ if __name__ == "__main__":
             point_cloud = tsdf_vol.get_point_cloud()  # 获取点云数据
             pcd.points = o3d.utility.Vector3dVector(point_cloud[:, :3])  # 更新点云坐标
             if point_cloud.shape[1] > 3:
-                pcd.colors = o3d.utility.Vector3dVector(point_cloud[:, 3:] / 255.0)  # 更新点云颜色（如果有）
+                pcd.colors = o3d.utility.Vector3dVector(point_cloud[:, 3:])  # 更新点云颜色（如果有）
 
             vis.update_geometry(pcd)  # 更新几何体数据
             vis.poll_events()  # 处理可视化事件
