@@ -32,7 +32,7 @@ import open3d as o3d
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
 
-
+import shutil
 # 定义摄像头和处理的类
 class PipelineModel:
     """控制IO（摄像头，视频文件，录制，保存帧）。方法在工作线程中运行。"""
@@ -103,12 +103,19 @@ class PipelineModel:
 
         self.volume = o3d.pipelines.integration.ScalableTSDFVolume(
             voxel_length=0.005,  # 体素长度（米），约 1cm
-            sdf_trunc=0.01,  # sdf 截断距离（米），约几个体素长度
+            sdf_trunc=0.5,  # sdf 截断距离（米），约几个体素长度
             color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8)  # 设置颜色类型为 RGB8
 
         self.source_down = []
         self.voxel_size = 0.01
         self.transform_0 = np.eye(4)
+        base_directory = "./"
+        self.base_directory = base_directory
+        self.image_depth_dir = os.path.join(base_directory, "images_depths")
+        self.pcd_dir = os.path.join(base_directory, "pcds")
+        self.image_depth_counter = 1
+        self.pcd_counter = 1
+        self.ensure_directory_clean()
 
     @property
     def max_points(self):
@@ -120,7 +127,12 @@ class PipelineModel:
         """获取摄像头或RGBD视频的垂直视场角。"""
         return np.rad2deg(2 * np.arctan(self.intrinsic_matrix[1, 2].item() /
                                         self.intrinsic_matrix[1, 1].item()))
-
+    def ensure_directory_clean(self):
+        """确保目标文件夹存在且为空。"""
+        for directory in [self.image_depth_dir, self.pcd_dir]:
+            if os.path.exists(directory):
+                shutil.rmtree(directory)
+            os.makedirs(directory)
     def run(self):
         """运行管线。"""
         n_pts = 0
@@ -170,58 +182,14 @@ class PipelineModel:
                 n_pts = 0
 
             self.rgbd_frame = future_rgbd_frame.result()
+            self.save_rgbd(self.rgbd_frame)
+            self.save_pcd(self.pcd_frame)
 
-            if frame_id == 0:
-                frame_id += 1
-                self.source_down = self.pcd_frame
-                continue
-            target_down = self.pcd_frame
-            result_ransac = o3d.t.pipelines.registration.icp(self.source_down, target_down,
-                                                             # init_source_to_target=camera_poses_cpu[i+1].pose,
-                                                             estimation_method=o3d.t.pipelines.registration.TransformationEstimationPointToPoint(),
-                                                             max_correspondence_distance=self.voxel_size * 1.5,
-                                                             voxel_size=self.voxel_size,
-                                                             criteria=o3d.t.pipelines.registration.ICPConvergenceCriteria(
-                                                                 max_iteration=1000))
-            self.source_down = self.pcd_frame
-
-            transform = result_ransac.transformation  # 获取变换矩阵
-
-            transformation_float_values = np.eye(4)
-            # 遍历张量的每个元素，并将其转换为 float
-            for m in range(transform.shape[0]):
-                for n in range(transform.shape[1]):
-                    transformation_float_values[m][n] = transform[m][n].item()
-            transform = np.dot(transformation_float_values, self.transform_0)  # 计算累计变换
-            self.transform_0 = transform  # 更新当前变换
-
-            print(self.pcd_frame)
             color_image_ = o3d.t.geometry.Image.to_legacy(self.rgbd_frame.color)
-            color_depth_ = o3d.t.geometry.Image.to_legacy(self.rgbd_frame.depth)
-            rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
-                color_image_, color_depth_,
-                depth_trunc=5,  # 深度截断
-                convert_rgb_to_intensity=False)  # 创建 RGBD 图像
-            self.volume.integrate(rgbd, self.rgbd_metadata.intrinsics, self.transform_0)  # 集成到 TSDF 体积
-            # pcd = o3d.geometry.PointCloud.create_from_rgbd_image(
-            #     rgbd, intrinsic=self.rgbd_metadata.intrinsics
-            # )
-            # o3d.visualization.draw_geometries([pcd])4
             cv2.imshow('color',np.array(color_image_))
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
             frame_id += 1
-        mesh = self.volume.extract_triangle_mesh()  # 提取三角网格
-        print(mesh.compute_vertex_normals())  # 计算顶点法线
-        mesh.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])  # 翻转网格
-
-        o3d.visualization.draw_geometries([mesh])  # 显示网格
-        o3d.io.write_triangle_mesh(
-            'Mesh__%s__every_%sth_%sframes_gpu.ply' % ("file_name", "skip_N_frames", len("camera_poses")),
-            mesh)  # 写入三角网格
-        meshRead = o3d.io.read_triangle_mesh(
-            'Mesh__%s__every_%sth_%sframes_gpu.ply' % ("file_name", "skip_N_frames", len("camera_poses")))  # 读取三角网格
-        o3d.visualization.draw_geometries([meshRead])  # 显示网格
         self.executor.shutdown()
         log.debug(f"create_from_depth_image() errors = {pcd_errors}")
 
@@ -234,33 +202,34 @@ class PipelineModel:
                 self.camera.pause_record()
                 self.recording = False
 
-    def save_pcd(self):
-        """保存当前点云。"""
-        now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        filename = f"{self.rgbd_metadata.serial_number}_pcd_{now}.ply"
+    def save_pcd(self,pcd_frame):
+        """单独保存点云数据。"""
+        base_filename = str(self.pcd_counter)
+        pcd_filename = os.path.join(self.pcd_dir, f"{base_filename}.ply")
+
         # 转换颜色为 uint8 以确保兼容性
-        self.pcd_frame.point.colors = (self.pcd_frame.point.colors * 255).to(
-            o3d.core.Dtype.UInt8)
-        self.executor.submit(o3d.t.io.write_point_cloud,
-                             filename,
-                             self.pcd_frame,
-                             write_ascii=False,
-                             compressed=True,
-                             print_progress=False)
-        self.status_message = f"Saving point cloud to {filename}."
+        pcd_frame.point['colors'] = (pcd_frame.point['colors'] * 255).to(o3d.core.Dtype.UInt8)
 
-    def save_rgbd(self):
-        """保存当前RGBD图像对。"""
-        now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        filename = f"{self.rgbd_metadata.serial_number}_color_{now}.jpg"
-        self.executor.submit(o3d.t.io.write_image, filename,
-                             self.rgbd_frame.color)
-        filename = f"{self.rgbd_metadata.serial_number}_depth_{now}.png"
-        self.executor.submit(o3d.t.io.write_image, filename,
-                             self.rgbd_frame.depth)
-        self.status_message = (
-            f"Saving RGBD images to {filename[:-3]}.{{jpg,png}}.")
+        # 保存点云数据
+        o3d.t.io.write_point_cloud(pcd_filename, pcd_frame, write_ascii=False, compressed=True)
 
+        # 更新文件编号
+        self.pcd_counter += 1
+        print(f"Saved point cloud to {pcd_filename}")
+
+    def save_rgbd(self,rgbd_frame):
+        """单独保存RGB和深度图像。"""
+        base_filename = str(self.image_depth_counter)
+        image_filename = os.path.join(self.image_depth_dir, f"{base_filename}.jpg")
+        depth_filename = os.path.join(self.image_depth_dir, f"{base_filename}.png")
+
+        # 保存图像和深度图
+        o3d.t.io.write_image(image_filename, rgbd_frame.color)
+        o3d.t.io.write_image(depth_filename, rgbd_frame.depth)
+
+        # 更新文件编号
+        self.image_depth_counter += 1
+        print(f"Saved RGB image to {image_filename} and depth image to {depth_filename}")
 
 
 # 应用的入口点类。控制 PipelineModel 对象进行 IO 和处理，以及 PipelineView 对象进行显示和 UI。所有方法都在主线程上操作。

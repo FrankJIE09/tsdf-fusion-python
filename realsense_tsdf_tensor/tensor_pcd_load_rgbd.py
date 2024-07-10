@@ -29,8 +29,7 @@ from concurrent.futures import ThreadPoolExecutor
 import cv2
 import numpy as np
 import open3d as o3d
-import open3d.visualization.gui as gui
-import open3d.visualization.rendering as rendering
+import fusion
 
 
 # 定义摄像头和处理的类
@@ -89,11 +88,6 @@ class PipelineModel:
             self.rgbd_metadata.intrinsics.intrinsic_matrix,
             dtype=o3d.core.Dtype.Float32,
             device=self.o3d_device)
-        self.depth_max = 3.0  # m 深度上限
-        self.pcd_stride = 2  # 点云降采样，可能提高帧率
-        self.flag_normals = False
-        self.flag_save_rgbd = False
-        self.flag_save_pcd = False
 
         self.pcd_frame = None
         self.rgbd_frame = None
@@ -102,13 +96,17 @@ class PipelineModel:
         self.flag_exit = False
 
         self.volume = o3d.pipelines.integration.ScalableTSDFVolume(
-            voxel_length=0.005,  # 体素长度（米），约 1cm
-            sdf_trunc=0.01,  # sdf 截断距离（米），约几个体素长度
+            voxel_length=0.002,  # 体素长度（米），约 1cm
+            sdf_trunc=0.02,  # sdf 截断距离（米），约几个体素长度
             color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8)  # 设置颜色类型为 RGB8
 
         self.source_down = []
         self.voxel_size = 0.01
         self.transform_0 = np.eye(4)
+
+        self.base_directory = "./"
+        self.image_depth_dir = os.path.join(self.base_directory, "images_depths")
+        self.pcd_dir = os.path.join(self.base_directory, "pcds")
 
     @property
     def max_points(self):
@@ -122,55 +120,20 @@ class PipelineModel:
                                         self.intrinsic_matrix[1, 1].item()))
 
     def run(self):
-        """运行管线。"""
-        n_pts = 0
         frame_id = 0
-        t1 = time.perf_counter()
-        if self.video:
-            self.rgbd_frame = self.video.next_frame()
-        else:
-            self.rgbd_frame = self.camera.capture_frame(
-                wait=True, align_depth_to_color=True)
+        # 列出目录中的所有文件
+        files = os.listdir(self.image_depth_dir)
 
-        pcd_errors = 0
-        while (not self.flag_exit and
-               (self.video is None or  # 摄像头
-                (self.video and not self.video.is_eof()))):  # 视频
-            if self.video:
-                future_rgbd_frame = self.executor.submit(self.video.next_frame)
-            else:
-                future_rgbd_frame = self.executor.submit(
-                    self.camera.capture_frame,
-                    wait=True,
-                    align_depth_to_color=True)
+        # 计算扩展名为.png的文件数量
+        png_count = sum(
+            1 for file in files if
+            os.path.isfile(os.path.join(self.image_depth_dir, file)) and file.lower().endswith('.png'))
 
-            if self.flag_save_pcd:
-                self.save_pcd()
-                self.flag_save_pcd = False
-            try:
-                self.rgbd_frame = self.rgbd_frame.to(self.o3d_device)
-                self.pcd_frame = o3d.t.geometry.PointCloud.create_from_rgbd_image(
-                    self.rgbd_frame, self.intrinsic_matrix, self.extrinsics,
-                    self.rgbd_metadata.depth_scale, self.depth_max,
-                    self.pcd_stride, self.flag_normals)
-                depth_in_color = self.rgbd_frame.depth.colorize_depth(
-                    self.rgbd_metadata.depth_scale, 0, self.depth_max)
-            except RuntimeError:
-                pcd_errors += 1
+        while frame_id < png_count:
 
-            if self.pcd_frame.is_empty():
-                log.warning(f"No valid depth data in frame {frame_id})")
-                continue
-
-            n_pts += self.pcd_frame.point.positions.shape[0]
-            if frame_id % 60 == 0 and frame_id > 0:
-                t0, t1 = t1, time.perf_counter()
-                log.debug(f"\nframe_id = {frame_id}, \t {(t1 - t0) * 1000. / 60:0.2f}"
-                          f"ms/frame \t {(t1 - t0) * 1e9 / n_pts} ms/Mp\t")
-                n_pts = 0
-
-            self.rgbd_frame = future_rgbd_frame.result()
-
+            pcd_path = os.path.join(self.pcd_dir, f"{frame_id + 1}.ply")
+            self.pcd_frame = o3d.t.io.read_point_cloud(pcd_path,)
+            self.pcd_frame = self.pcd_frame.cuda()
             if frame_id == 0:
                 frame_id += 1
                 self.source_down = self.pcd_frame
@@ -192,22 +155,22 @@ class PipelineModel:
             for m in range(transform.shape[0]):
                 for n in range(transform.shape[1]):
                     transformation_float_values[m][n] = transform[m][n].item()
-            transform = np.dot(transformation_float_values, self.transform_0)  # 计算累计变换
-            self.transform_0 = transform  # 更新当前变换
+
 
             print(self.pcd_frame)
-            color_image_ = o3d.t.geometry.Image.to_legacy(self.rgbd_frame.color)
-            color_depth_ = o3d.t.geometry.Image.to_legacy(self.rgbd_frame.depth)
-            rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
-                color_image_, color_depth_,
-                depth_trunc=5,  # 深度截断
-                convert_rgb_to_intensity=False)  # 创建 RGBD 图像
-            self.volume.integrate(rgbd, self.rgbd_metadata.intrinsics, self.transform_0)  # 集成到 TSDF 体积
-            # pcd = o3d.geometry.PointCloud.create_from_rgbd_image(
-            #     rgbd, intrinsic=self.rgbd_metadata.intrinsics
-            # )
-            # o3d.visualization.draw_geometries([pcd])4
-            cv2.imshow('color',np.array(color_image_))
+            image_path = os.path.join(self.image_depth_dir, f"{frame_id + 1}.jpg")
+            depth_path = os.path.join(self.image_depth_dir, f"{frame_id + 1}.png")
+
+            # 读取图像和深度图
+            color = o3d.io.read_image(image_path)
+            depth = o3d.io.read_image(depth_path)
+            # 创建并返回Open3D RGBD图像对象
+            rgbd_frame = o3d.geometry.RGBDImage.create_from_color_and_depth(
+                color, depth, depth_scale=1000.0, depth_trunc=0.5, convert_rgb_to_intensity=False)
+            self.volume.integrate(rgbd_frame, self.rgbd_metadata.intrinsics, self.transform_0)  # 集成到 TSDF 体积
+            cv2.imshow('color', np.array(color))
+            transform = np.dot(transformation_float_values, self.transform_0)  # 计算累计变换
+            self.transform_0 = transform  # 更新当前变换
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
             frame_id += 1
@@ -223,7 +186,6 @@ class PipelineModel:
             'Mesh__%s__every_%sth_%sframes_gpu.ply' % ("file_name", "skip_N_frames", len("camera_poses")))  # 读取三角网格
         o3d.visualization.draw_geometries([meshRead])  # 显示网格
         self.executor.shutdown()
-        log.debug(f"create_from_depth_image() errors = {pcd_errors}")
 
     def toggle_record(self):
         if self.camera is not None:
@@ -260,7 +222,6 @@ class PipelineModel:
                              self.rgbd_frame.depth)
         self.status_message = (
             f"Saving RGBD images to {filename[:-3]}.{{jpg,png}}.")
-
 
 
 # 应用的入口点类。控制 PipelineModel 对象进行 IO 和处理，以及 PipelineView 对象进行显示和 UI。所有方法都在主线程上操作。
