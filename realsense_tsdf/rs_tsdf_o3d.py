@@ -32,7 +32,7 @@ def main():
     # 初始化体素体积
     volume = o3d.pipelines.integration.ScalableTSDFVolume(
         voxel_length=0.02,
-        sdf_trunc=0.04,
+        sdf_trunc=1,
         color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8)
 
     pcd_folder = "rs_pcd_folder"
@@ -46,7 +46,7 @@ def main():
         cam_pose_path = os.path.join(save_folder, f"pose_{i}.txt")
 
         color_image = cv2.imread(color_img_path, cv2.IMREAD_COLOR)
-        depth_image = cv2.imread(depth_img_path, cv2.IMREAD_UNCHANGED).astype(np.float32) / 1000.0
+        depth_image = cv2.imread(depth_img_path, cv2.IMREAD_UNCHANGED).astype(np.float32)
         cam_intr = load_intrinsics(intrinsics_path)
         cam_pose = np.loadtxt(cam_pose_path)
 
@@ -72,7 +72,14 @@ def main():
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
+        # 将RGBDImage转换为点云
+        pcd = o3d.geometry.PointCloud.create_from_rgbd_image(
+            rgbd_image,
+            o3d.camera.PinholeCameraIntrinsic(
+                o3d.camera.PinholeCameraIntrinsicParameters.PrimeSenseDefault))
 
+        # 可视化点云
+        o3d.visualization.draw_geometries([pcd])
     mesh = volume.extract_triangle_mesh()
     mesh.compute_vertex_normals()
     o3d.io.write_triangle_mesh(os.path.join(save_folder, "mesh.ply"), mesh)

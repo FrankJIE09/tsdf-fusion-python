@@ -8,6 +8,7 @@ import fusion
 from skimage import measure
 import os
 import open3d as o3d
+
 if __name__ == "__main__":
     # ======================================================================================================== #
     # 计算数据集中所有相机视锥的凸包在世界坐标系中的3D边界
@@ -35,7 +36,7 @@ if __name__ == "__main__":
     # ======================================================================================================== #
     # 初始化体素体积
     print("Initializing voxel volume...")  # 打印当前操作
-    tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.02)  # 创建TSDF体素体积对象，体素大小为2cm
+    tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.01,sdf_trunc=2)  # 创建TSDF体素体积对象，体素大小为2cm
     # 确保PCD文件夹存在
     pcd_folder = "pcd_folder"
     os.makedirs(pcd_folder, exist_ok=True)
@@ -53,10 +54,13 @@ if __name__ == "__main__":
 
         # 将观测结果融合到体素体积中（假设颜色与深度对齐）
         tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)  # 融合当前帧
-
-        # 提取并保存每一帧的点云
+        cv2.imshow('Color Image', color_image)
+        depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_im, alpha=255 / depth_im.max()), cv2.COLORMAP_JET)
+        cv2.imshow('Depth Image', depth_colormap)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
         # 从TSDF体积提取点云并转换为Open3D点云格式
-        if i % 10==0:
+        if i % 10 == 0:
             point_cloud = tsdf_vol.get_point_cloud()
             pcd = o3d.geometry.PointCloud()
             pcd.points = o3d.utility.Vector3dVector(point_cloud[:, :3])  # 更新点云坐标
@@ -65,6 +69,20 @@ if __name__ == "__main__":
             # 保存当前帧的点云到PCD文件
             pcd_filename = os.path.join(pcd_folder, f"frame-{i:06d}.pcd")
             o3d.io.write_point_cloud(pcd_filename, pcd)
+            # pcd = o3d.io.read_point_cloud( f"frame-{i:06d}.pcd")
+
+            # 设置窗口属性并可视化点云
+            o3d.visualization.draw_geometries(
+                [pcd],  # 要显示的几何对象列表
+                window_name="Point Cloud",  # 窗口名称
+                width=1920,  # 窗口宽度
+                height=1080,  # 窗口高度
+                left=50,  # 窗口左上角横坐标
+                top=50,  # 窗口左上角纵坐标
+                point_show_normal=False,  # 是否显示点的法线
+                mesh_show_wireframe=False,  # 是否显示网格线框
+                mesh_show_back_face=False  # 是否显示背面的网格
+            )
 
     fps = n_imgs / (time.time() - t0_elapse)  # 计算平均帧率
     print("Average FPS: {:.2f}".format(fps))  # 打印平均帧率

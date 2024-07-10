@@ -1,0 +1,37 @@
+{
+    "_comment_name": "数据集的名称，用于描述数据集",
+    "name": "Realsense bag file",
+
+    "_comment_path_dataset": "数据集文件的路径，包含 RGB-D 图像序列的 .bag 文件",
+    "path_dataset": "/home/frank/Documents/realsense2.bag",
+
+    "_comment_path_intrinsic": "相机内参文件的路径。如果留空，则使用默认内参",
+    "path_intrinsic": "",
+
+    "_comment_depth_max": "深度图像的最大深度值，超过该值的深度数据将被忽略（单位：米）",
+    "depth_max": 0.5,
+
+    "_comment_voxel_size": "体素大小，控制重建过程中使用的体素分辨率（单位：米）",
+    "voxel_size": 0.02,
+
+    "_comment_depth_diff_max": "最大深度差，用于深度图像配准时的容差（单位：米）",
+    "depth_diff_max": 0.05,
+
+    "_comment_preference_loop_closure_odometry": "回环闭合时里程计优先级的权重",
+    "preference_loop_closure_odometry": 0.1,
+
+    "_comment_preference_loop_closure_registration": "回环闭合时配准优先级的权重",
+    "preference_loop_closure_registration": 5.0,
+
+    "_comment_tsdf_cubic_size": "TSDF 体积的立方体尺寸，用于体积融合（单位：米）",
+    "tsdf_cubic_size": 1.0,
+
+    "_comment_icp_method": "ICP（Iterative Closest Point）方法，用于点云配准。可以是 'point_to_point', 'point_to_plane' 或 'color'",
+    "icp_method": "color",
+
+    "_comment_global_registration": "全局配准方法，可以选择 'ransac' 或其他全局配准算法",
+    "global_registration": "ransac",
+
+    "_comment_python_multi_threading": "是否启用 Python 多线程，启用后可提高并行处理能力，缩短处理时间",
+    "python_multi_threading": true
+}

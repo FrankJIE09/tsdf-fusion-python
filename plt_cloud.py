@@ -1,7 +1,7 @@
 import open3d as o3d
 
 # 读取点云数据
-pcd = o3d.io.read_point_cloud("mesh.ply")
+pcd = o3d.io.read_point_cloud("pc.ply")
 
 # 设置窗口属性并可视化点云
 o3d.visualization.draw_geometries(

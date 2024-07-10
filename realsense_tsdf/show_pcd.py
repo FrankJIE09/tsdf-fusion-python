@@ -30,7 +30,7 @@ def realtime_visualize_pcds(folder_path):
 
         vis.poll_events()
         vis.update_renderer()
-        time.sleep(0.01)  # 控制每帧展示的时间
+        time.sleep(0.1)  # 控制每帧展示的时间
 
     # 阻塞代码，保持窗口打开
     print("Press 'q' to close the window...")
