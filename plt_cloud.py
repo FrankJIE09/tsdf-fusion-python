@@ -2,7 +2,8 @@ import open3d as o3d
 
 # 读取点云数据
 pcd = o3d.io.read_point_cloud("pc.ply")
-
+pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])  # 翻转网格
+#
 # 设置窗口属性并可视化点云
 o3d.visualization.draw_geometries(
     [pcd],                              # 要显示的几何对象列表

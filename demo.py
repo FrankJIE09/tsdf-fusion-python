@@ -36,7 +36,7 @@ if __name__ == "__main__":
     # ======================================================================================================== #
     # 初始化体素体积
     print("Initializing voxel volume...")  # 打印当前操作
-    tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.01,sdf_trunc=2)  # 创建TSDF体素体积对象，体素大小为2cm
+    tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.01,sdf_trunc=0.5)  # 创建TSDF体素体积对象，体素大小为2cm
     # 确保PCD文件夹存在
     pcd_folder = "pcd_folder"
     os.makedirs(pcd_folder, exist_ok=True)
@@ -70,6 +70,7 @@ if __name__ == "__main__":
             pcd_filename = os.path.join(pcd_folder, f"frame-{i:06d}.pcd")
             o3d.io.write_point_cloud(pcd_filename, pcd)
             # pcd = o3d.io.read_point_cloud( f"frame-{i:06d}.pcd")
+            pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])  # 翻转网格
 
             # 设置窗口属性并可视化点云
             o3d.visualization.draw_geometries(

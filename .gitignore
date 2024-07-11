@@ -105,3 +105,5 @@ __pycache__
 /pcd_folder_backup/frame-000990.pcd
 /realsense_tsdf_tensor/pcds_backup/
 /realsense_tsdf_tensor/images_depths_backup/
+/realsense_tsdf_tensor/images_depths_muti/
+/realsense_tsdf_tensor/pcds_muti/

@@ -77,6 +77,11 @@ class PipelineModel:
                 self.camera.init_sensor(filename=filename)
             self.camera.start_capture(start_record=False)
             self.rgbd_metadata = self.camera.get_metadata()
+            intrinsics_matrix = self.rgbd_metadata.intrinsics.intrinsic_matrix
+            np.save('config/intrinsics_matrix.npy', intrinsics_matrix)
+            np.save('config/width.npy', self.rgbd_metadata.width)
+            np.save('config/height.npy', self.rgbd_metadata.height)
+
             self.status_message = f"Camera {self.rgbd_metadata.serial_number} opened."
 
         log.info(self.rgbd_metadata)
@@ -302,7 +307,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--camera-config',
+    parser.add_argument('--camera-config',default='./config/camera.json',
                         help='RGBD摄像头配置JSON文件')
     parser.add_argument('--rgbd-video', help='RGBD视频文件（RealSense bag）')
     parser.add_argument('--device',
