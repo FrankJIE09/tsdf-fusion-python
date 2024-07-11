@@ -73,14 +73,14 @@ class PipelineModel:
         self.executor = ThreadPoolExecutor(max_workers=3,
                                            thread_name_prefix='Capture-Save')
         self.flag_exit = False
+        self.voxel_size = 0.02
 
         self.volume = o3d.pipelines.integration.ScalableTSDFVolume(
-            voxel_length=0.005,  # 体素长度（米），约 1cm
-            sdf_trunc=1,  # sdf 截断距离（米），约几个体素长度
+            voxel_length=0.002,  # 体素长度（米），约 1cm
+            sdf_trunc=0.1,  # sdf 截断距离（米），约几个体素长度
             color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8)  # 设置颜色类型为 RGB8
 
         self.source_down = []
-        self.voxel_size = 0.02
         self.transform_0 = np.eye(4)
 
         self.base_directory = "./"
@@ -180,7 +180,7 @@ class PipelineModel:
 
                 o3d.visualization.draw_geometries(
                     [pcd],  # 要显示的几何对象列表
-                    window_name="Point Cloud",  # 窗口名称
+                    window_name="TSDF",  # 窗口名称
                     width=1920,  # 窗口宽度
                     height=1080,  # 窗口高度
                     left=50,  # 窗口左上角横坐标

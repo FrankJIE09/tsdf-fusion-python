@@ -37,7 +37,7 @@ import shutil
 class PipelineModel:
     """控制IO（摄像头，视频文件，录制，保存帧）。方法在工作线程中运行。"""
 
-    def __init__(self, update_view, camera_config_file=None, rgbd_video=None, device=None):
+    def __init__(self, camera_config_file=None, rgbd_video=None, device=None):
         """初始化。
         Args:
             update_view (callback): 回调函数，用于更新帧的显示元素。
@@ -45,7 +45,6 @@ class PipelineModel:
             rgbd_video (str): 包含RGBD视频的RS bag文件。如果提供，将忽略连接的摄像头。
             device (str): 计算设备（例如：'cpu:0' 或 'cuda:0'）。
         """
-        self.update_view = update_view
         if device:
             self.device = device.lower()
         else:
@@ -249,56 +248,10 @@ class PipelineController:
             rgbd_video (str): 包含 RGBD 视频的 RS bag 文件。如果提供，将忽略连接的摄像头。
             device (str): 计算设备（例如：'cpu:0' 或 'cuda:0'）。
         """
-        self.pipeline_model = PipelineModel(self.update_view,
+        self.pipeline_model = PipelineModel(
                                             camera_config_file, rgbd_video,
                                             device)
         self.pipeline_model.run()
-
-    def update_view(self, frame_elements):
-        """使用新数据更新视图。可以从任何线程调用。
-        Args:
-            frame_elements (dict): 显示元素（点云和图像）
-                从新帧显示的新数据。
-        """
-        gui.Application.instance.post_to_main_thread(
-            self.pipeline_view.window,
-            lambda: self.pipeline_view.update(frame_elements))
-
-    def on_toggle_capture(self, is_enabled):
-        """切换捕捉的回调函数。"""
-        self.pipeline_model.flag_capture = is_enabled
-        if not is_enabled:
-            self.on_toggle_record(False)
-            if self.pipeline_view.toggle_record is not None:
-                self.pipeline_view.toggle_record.is_on = False
-        else:
-            with self.pipeline_model.cv_capture:
-                self.pipeline_model.cv_capture.notify()
-
-    def on_toggle_record(self, is_enabled):
-        """切换录制 RGBD 视频的回调函数。"""
-        self.pipeline_model.flag_record = is_enabled
-
-    def on_toggle_normals(self, is_enabled):
-        """切换显示法线的回调函数"""
-        self.pipeline_model.flag_normals = is_enabled
-        self.pipeline_view.flag_normals = is_enabled
-        self.pipeline_view.flag_gui_init = False
-
-    def on_window_close(self):
-        """用户关闭应用程序窗口时的回调函数。"""
-        self.pipeline_model.flag_exit = True
-        with self.pipeline_model.cv_capture:
-            self.pipeline_model.cv_capture.notify_all()
-        return True  # 确认可以关闭窗口
-
-    def on_save_pcd(self):
-        """保存当前点云的回调函数。"""
-        self.pipeline_model.flag_save_pcd = True
-
-    def on_save_rgbd(self):
-        """保存当前 RGBD 图像对的回调函数。"""
-        self.pipeline_model.flag_save_rgbd = True
 
 
 if __name__ == "__main__":
