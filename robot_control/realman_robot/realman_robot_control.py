@@ -31,9 +31,7 @@ class RoboticArmRecalibration:
         joint_with_zero = [0] + joint
         joint_in_radians = np.deg2rad(joint_with_zero)
         T = self.my_chain.forward_kinematics(joint_in_radians)
-        print("T:", T)
         return T
-
 
     def move_robot(self, target_matrix):
         joint = np.deg2rad(self.robot.get_current_joint())
@@ -53,8 +51,4 @@ class RoboticArmRecalibration:
 
 
 def mcallback(data):
-    pass
-
-
-def mcallback():
     pass

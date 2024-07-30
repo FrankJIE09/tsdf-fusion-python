@@ -1,3 +1,4 @@
+learn*
 __pycache__
 ./realsense_tsdf/captured_images/*
 ./pcd_folder_backup

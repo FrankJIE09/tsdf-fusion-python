@@ -67,6 +67,18 @@ class PipelineModel:
             now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
             filename = f"{now}.bag"
             self.camera = o3d.t.io.RealSenseSensor()
+            # 创建配置对象
+            # sensor_config = o3d.t.io.RealSenseSensorConfig(config="")
+
+            # 设置配置参数（可以根据需要调整）
+            # sensor_config.width = 1280
+            # sensor_config.height = 720
+            # sensor_config.fps = 30
+            # sensor_config.enable_color = True  # 启用颜色
+            # sensor_config.enable_depth = True  # 启用深度
+
+            # 初始化传感器
+            # self.camera.init_sensor(sensor_config)
             if camera_config_file:
                 with open(camera_config_file) as ccf:
                     self.camera.init_sensor(o3d.t.io.RealSenseSensorConfig(

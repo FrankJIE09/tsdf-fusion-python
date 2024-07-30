@@ -22,14 +22,11 @@ import json
 import time
 import logging as log
 import argparse
-import threading
-from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 
 import cv2
 import numpy as np
 import open3d as o3d
-import fusion
 
 
 # 定义摄像头和处理的类
